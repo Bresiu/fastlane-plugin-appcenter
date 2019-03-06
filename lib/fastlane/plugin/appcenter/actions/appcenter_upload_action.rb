@@ -76,7 +76,7 @@ module Fastlane
           req.headers['X-API-Token'] = api_token
           req.headers['internal-request-source'] = "fastlane"
           req.body = {
-            symbol_type: 'Apple'
+            symbol_type: 'AndroidProguard'
           }
         end
 
@@ -124,18 +124,20 @@ module Fastlane
       # otherwise aborts
       def self.upload_dsym(api_token, owner_name, app_name, dsym, symbol_upload_id, upload_url)
         connection = self.connection(upload_url, true)
-
+        UI.message("dsym #{dsym}")
         response = connection.put do |req|
           req.headers['x-ms-blob-type'] = "BlockBlob"
           req.headers['Content-Length'] = File.size(dsym).to_s
           req.headers['internal-request-source'] = "fastlane"
-          req.body = Faraday::UploadIO.new(dsym, 'application/octet-stream') if dsym && File.exist?(dsym)
+          req.body = Faraday::UploadIO.new(dsym, "text/plain", dsym) if dsym && File.exist?(dsym)
+          UI.message("message #{req}")
         end
-
         case response.status
         when 200...300
+
           self.update_dsym_upload(api_token, owner_name, app_name, symbol_upload_id, 'committed')
           UI.success("dSYM uploaded")
+          UI.success("response #{response}")
         else
           UI.error("Error uploading dSYM #{response.status}: #{response.body}")
           self.update_dsym_upload(api_token, owner_name, app_name, symbol_upload_id, 'aborted')
@@ -308,26 +310,15 @@ module Fastlane
         dsym_path = nil
         if dsym
           # we can use dsym parameter only if build file is ipa
-          dsym_path = dsym if !file || File.extname(file) == '.ipa'
-        else
-          # if dsym is note set, but build is ipa - check default path
-          if file && File.exist?(file) && File.extname(file) == '.ipa'
-            dsym_path = file.to_s.gsub('.ipa', '.dSYM.zip')
-            UI.message("dSYM is found")
-          end
+          dsym_path = dsym if !file# || File.extname(file) == '.ipa'
+          UI.message("dsym_path: #{dsym_path}")
         end
 
         # if we provided valid dsym path, or <ipa_path>.dSYM.zip was found, start dSYM upload
         if dsym_path && File.exist?(dsym_path)
-          if File.directory?(dsym_path)
-            UI.message("dSYM path is folder, zipping...")
-            dsym_path = Actions::ZipAction.run(path: dsym, output_path: dsym + ".zip")
-            UI.message("dSYM files zipped")
-          end
-
           values[:dsym_path] = dsym_path
-
           UI.message("Starting dSYM upload...")
+          UI.message("BRES...")
           dsym_upload_details = self.create_dsym_upload(api_token, owner_name, app_name)
 
           if dsym_upload_details

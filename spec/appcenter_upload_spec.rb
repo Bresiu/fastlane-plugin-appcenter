@@ -516,7 +516,7 @@ describe Fastlane::Actions::AppcenterUploadAction do
           group: 'Testers'
         })
       end").runner.execute(:test)
-
+      UI.success("TEST: values[:dsym_path] #{values[:dsym_path]}")
       expect(values[:dsym_path].end_with?(".zip")).to eq(true)
     end
 
